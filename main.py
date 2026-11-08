@@ -25,7 +25,7 @@ def start(message):
 
 @bot.message_handler(commands=['calc'])
 def calc(message):
-    msg = bot.send_message(message.chat.id, "Введи площадь комнаты в кв.м (например: 20):")
+    msg = bot.send_message(message.chat.id, "Введи площадь поверхности для укладки (стены/пол) в кв.м (например: 20):")
     bot.register_next_step_handler(msg, get_room_area)
 
 def get_room_area(message):
