@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькулятор раскладки плитки</title>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #17212b; color: #f5f5f5; min-height: 100vh; padding: 30px 15px; }
+.container { max-width: 850px; margin: auto; }
+h1 { text-align: center; font-size: 27px; margin-bottom: 10px; }
+.subtitle { text-align: center; color: #8b9bab; margin-bottom: 30px; font-size: 14px; }
+.card { background: #242f3d; padding: 25px; border-radius: 16px; margin-bottom: 20px; border: 1px solid #344354; }
+h2 { font-size: 18px; margin-bottom: 20px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+label { display: block; color: #a9b7c6; font-size: 13px; margin-bottom: 8px; }
+input { width: 100%; padding: 13px; border-radius: 9px; border: 1px solid #405166; background: #17212b; color: white; font-size: 16px; outline: none; transition: border 0.2s; }
+input:focus { border-color: #5288c1; }
+button { width: 100%; padding: 15px; margin-top: 22px; background: #5288c1; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+button:hover { background: #669bd3; }
+button:active { transform: scale(0.98); }
+.results { display: none; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat { background: #17212b; border-radius: 12px; padding: 18px 10px; text-align: center; }
+.stat-number { font-size: 26px; font-weight: bold; color: #64b5f6; }
+.stat-label { color: #8b9bab; font-size: 12px; margin-top: 7px; }
+.canvas-wrapper { width: 100%; overflow: hidden; background: #17212b; border-radius: 12px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; }
+.result-text { margin-top: 18px; padding: 16px; background: #17212b; border-radius: 10px; text-align: center; line-height: 1.7; font-size: 15px; }
+.error { display: none; background: #542c35; color: #ffb4b4; padding: 12px; border-radius: 9px; margin-top: 15px; font-size: 14px; }
+.note { color: #8494a5; font-size: 12px; margin-top: 15px; line-height: 1.5; }
+
+@media (max-width: 550px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+    h1 { font-size: 22px; }
+    .card { padding: 18px; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>🧱 Калькулятор плитки</h1>
+    <p class="subtitle">Расчёт количества плитки и визуализация раскладки</p>
+
+    <div class="card">
+        <h2>Параметры помещения</h2>
+        <div class="form-grid">
+            <div><label>Длина комнаты (м)</label><input type="number" id="roomLength" value="5" min="0.01" step="0.01"></div>
+            <div><label>Ширина комнаты (м)</label><input type="number" id="roomWidth" value="4" min="0.01" step="0.01"></div>
+            <div><label>Длина плитки (м)</label><input type="number" id="tileLength" value="1.2" min="0.01" step="0.01"></div>
+            <div><label>Ширина плитки (м)</label><input type="number" id="tileWidth" value="0.2" min="0.01" step="0.01"></div>
+            <div><label>Ширина шва (мм)</label><input type="number" id="joint" value="2" min="0" step="0.5"></div>
+        </div>
+
+        <button onclick="calculate()">Рассчитать</button>
+        <div class="error" id="error"></div>
+        <p class="note">Укажите размеры комнаты и плитки в метрах. Ширина шва указывается в миллиметрах.</p>
+    </div>
+
+    <div class="card results" id="results">
+        <h2>Результаты расчёта</h2>
+        <div class="stats">
+            <div class="stat"><div class="stat-number" id="total">0</div><div class="stat-label">Всего плиток</div></div>
+            <div class="stat"><div class="stat-number" id="whole">0</div><div class="stat-label">Целых плиток</div></div>
+            <div class="stat"><div class="stat-number" id="cuts">0</div><div class="stat-label">Подрезки</div></div>
+        </div>
+        
+        <div class="canvas-wrapper">
+            <canvas id="tileCanvas"></canvas>
+        </div>
+        
+        <div class="result-text" id="resultText"></div>
+    </div>
+</div>
+
+<script>
+function calculate() {
+    const roomLength = parseFloat(document.getElementById('roomLength').value);
+    const roomWidth = parseFloat(document.getElementById('roomWidth').value);
+    const tileLength = parseFloat(document.getElementById('tileLength').value);
+    const tileWidth = parseFloat(document.getElementById('tileWidth').value);
+    const joint = parseFloat(document.getElementById('joint').value) / 1000; // мм в метры
+
+    const errorEl = document.getElementById('error');
+    const resultsEl = document.getElementById('results');
+
+    if (!roomLength || !roomWidth || !tileLength || !tileWidth || isNaN(joint) || roomLength <= 0 || roomWidth <= 0 || tileLength <= 0 || tileWidth <= 0) {
+        errorEl.style.display = 'block';
+        errorEl.textContent = 'Пожалуйста, введите корректные положительные размеры.';
+        resultsEl.style.display = 'none';
+        return;
+    }
+
+    errorEl.style.display = 'none';
+    resultsEl.style.display = 'block';
+
+    const stepX = tileLength + joint;
+    const stepY = tileWidth + joint;
+
+    const countX = Math.ceil(roomLength / stepX);
+    const countY = Math.ceil(roomWidth / stepY);
+    const totalTiles = countX * countY;
+
+    // Рисование на canvas
+    const canvas = document.getElementById('tileCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Масштабирование под экран
+    const maxSize = 800;
+    const scale = Math.min(maxSize / roomLength, maxSize / roomWidth);
+    
+    canvas.width = roomLength * scale;
+    canvas.height = roomWidth * scale;
+
+    // Белый фон
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Рисуем сетку
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i <= countX; i++) {
+        let x = (i * stepX) * scale;
+        if (x > canvas.width) x = canvas.width;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+    }
+
+    for (let j = 0; j <= countY; j++) {
+        let y = (j * stepY) * scale;
+        if (y > canvas.height) y = canvas.height;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+    }
+
+    // Черная рамка комнаты
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+    // Вывод цифр
+    document.getElementById('total').textContent = totalTiles;
+    let wholeTiles = Math.floor(roomLength / stepX) * Math.floor(roomWidth / stepY);
+    document.getElementById('whole').textContent = wholeTiles;
+    document.getElementById('cuts').textContent = totalTiles - wholeTiles;
+
+    document.getElementById('resultText').textContent = `Комната ${roomLength}x${roomWidth} м. Плитка ${tileLength}x${tileWidth} м. Шов ${joint * 1000} мм.`;
+}
+</script>
+
+</body>
+</html>
